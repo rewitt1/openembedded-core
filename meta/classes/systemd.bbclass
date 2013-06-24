@@ -12,6 +12,37 @@ SYSTEMD_AUTO_ENABLE ??= "enable"
 # even if the systemd DISTRO_FEATURE isn't enabled.  As such don't make any
 # changes directly but check the DISTRO_FEATURES first.
 python __anonymous() {
+    # Check if systemd-packages already included in PACKAGES
+    def systemd_check_package(pkg_systemd):
+        packages = d.getVar('PACKAGES', True)
+        if not pkg_systemd in packages.split():
+            bb.error('%s does not appear in package list, please add it' % pkg_systemd)
+
+
+    def systemd_generate_package_scripts(pkg):
+        bb.debug(1, 'adding systemd calls to postinst/postrm for %s' % pkg)
+
+        # Add pkg to the overrides so that it finds the SYSTEMD_SERVICE_pkg
+        # variable.
+        localdata = d.createCopy()
+        localdata.prependVar("OVERRIDES", pkg + ":")
+        bb.data.update_data(localdata)
+
+        shebang = '#!/bin/sh\n'
+        postinst = d.getVar('pkg_postinst_%s' % pkg, True)
+        if not postinst:
+            postinst = shebang
+        postinst += localdata.getVar('systemd_postinst', True)
+        if postinst != shebang:
+            d.setVar('pkg_postinst_%s' % pkg, postinst)
+
+        prerm = d.getVar('pkg_prerm_%s' % pkg, True)
+        if not prerm:
+            prerm = '#!/bin/sh\n'
+        prerm += localdata.getVar('systemd_prerm', True)
+        d.setVar('pkg_prerm_%s' % pkg, prerm)
+
+
     features = d.getVar("DISTRO_FEATURES", True).split()
     # If the distro features have systemd but not sysvinit, inhibit update-rcd
     # from doing any work so that pure-systemd images don't have redundant init
@@ -20,6 +51,12 @@ python __anonymous() {
         d.appendVar("DEPENDS", " systemd-systemctl-native")
         if "sysvinit" not in features:
             d.setVar("INHIBIT_UPDATERCD_BBCLASS", "1")
+
+        for pkg in d.getVar('SYSTEMD_PACKAGES', True).split():
+            systemd_check_package(pkg)
+            if d.getVar('SYSTEMD_SERVICE_' + pkg, True):
+                systemd_generate_package_scripts(pkg)
+
 }
 
 systemd_postinst() {
@@ -57,35 +94,6 @@ python systemd_populate_packages() {
         if val == "":
             val = (d.getVar(var, True) or "").strip()
         return val
-
-    # Check if systemd-packages already included in PACKAGES
-    def systemd_check_package(pkg_systemd):
-        packages = d.getVar('PACKAGES', True)
-        if not pkg_systemd in packages.split():
-            bb.error('%s does not appear in package list, please add it' % pkg_systemd)
-
-
-    def systemd_generate_package_scripts(pkg):
-        bb.debug(1, 'adding systemd calls to postinst/postrm for %s' % pkg)
-
-        # Add pkg to the overrides so that it finds the SYSTEMD_SERVICE_pkg
-        # variable.
-        localdata = d.createCopy()
-        localdata.prependVar("OVERRIDES", pkg + ":")
-        bb.data.update_data(localdata)
-
-        postinst = d.getVar('pkg_postinst_%s' % pkg, True)
-        if not postinst:
-            postinst = '#!/bin/sh\n'
-        postinst += localdata.getVar('systemd_postinst', True)
-        d.setVar('pkg_postinst_%s' % pkg, postinst)
-
-        prerm = d.getVar('pkg_prerm_%s' % pkg, True)
-        if not prerm:
-            prerm = '#!/bin/sh\n'
-        prerm += localdata.getVar('systemd_prerm', True)
-        d.setVar('pkg_prerm_%s' % pkg, prerm)
-
 
     # Add files to FILES_*-systemd if existent and not already done
     def systemd_append_file(pkg_systemd, file_append):
@@ -153,10 +161,6 @@ python systemd_populate_packages() {
 
     # Run all modifications once when creating package
     if os.path.exists(d.getVar("D", True)):
-        for pkg in d.getVar('SYSTEMD_PACKAGES', True).split():
-            systemd_check_package(pkg)
-            if d.getVar('SYSTEMD_SERVICE_' + pkg, True):
-                systemd_generate_package_scripts(pkg)
         systemd_check_services()
 }
 
