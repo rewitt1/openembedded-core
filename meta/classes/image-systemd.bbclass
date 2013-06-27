@@ -10,15 +10,15 @@ run_systemctl_commands() {
 if type systemctl >/dev/null 2>/dev/null; then
 	for unit in ${SYSTEMD_UNITS_ENABLE}; do
 		systemctl --root=${IMAGE_ROOTFS} enable ${unit} && continue
-                echo "WARNING: Could not enable unit ${unit}"
+		echo "WARNING: Could not enable unit ${unit}"
 	done
 	for unit in ${SYSTEMD_UNITS_DISABLE}; do
 		systemctl --root=${IMAGE_ROOTFS} disable ${unit} && continue
-                echo "WARNING: Could not disable unit ${unit}"
+		echo "WARNING: Could not disable unit ${unit}"
 	done
 	for unit in ${SYSTEMD_UNITS_MASK}; do
 		systemctl --root=${IMAGE_ROOTFS} mask ${unit} && continue
-                echo "WARNING: Could not mask unit ${unit}"
+		echo "WARNING: Could not mask unit ${unit}"
 	done
 fi
 }
