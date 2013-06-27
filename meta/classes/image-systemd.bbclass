@@ -7,7 +7,7 @@ SYSTEMD_UNITS_DISABLE ??= ""
 SYSTEMD_UNITS_MASK ??= ""
 
 run_systemctl_commands() {
-if type systemctl >/dev/null 2>/dev/null; then
+if type systemctl > /dev/null 2>&1; then
 	for unit in ${SYSTEMD_UNITS_ENABLE}; do
 		systemctl --root=${IMAGE_ROOTFS} enable ${unit} && continue
 		echo "WARNING: Could not enable unit ${unit}"
